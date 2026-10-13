@@ -1,0 +1,134 @@
+= Author the Playbook
+
+Now for the part Scott said would take all week. You're going to describe the entire web service in one small YAML file, using the `podman` system role to deploy it.
+
+== Create the project directory
+
+Keeping the playbook in its own directory makes it easy to find, version, and hand to the next person.
+
+[source,bash,run]
+----
+mkdir -p ~/podman-lab
+----
+
+== Write the playbook
+
+Create `~/podman-lab/playbook.yml` with the following content — paste the whole block into the terminal.
+
+[source,bash,run]
+----
+cat > ~/podman-lab/playbook.yml << 'EOF'
+---
+- name: Deploy a secure nginx web server
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Manage the nginx quadlet with the podman system role
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.podman
+      vars:
+        podman_quadlet_specs:
+          - name: nginx
+            type: container
+            file_content: |
+              [Container]
+              Image=registry.access.redhat.com/ubi9/nginx-124:1
+              PublishPort=8080:8080
+              PodmanArgs=--security-opt no-new-privileges
+        podman_firewall:
+          - port: 8080/tcp
+            state: enabled
+EOF
+----
+
+That's the whole service. Twenty-odd lines of YAML define, configure, and deploy a web server. Let's walk through what each part does before you run it.
+
+======
+
+.The play header
+[%collapsible]
+=====
+[source,yaml]
+----
+- name: Deploy a secure nginx web server
+  hosts: localhost
+  become: true
+----
+
+* `hosts: localhost` — apply this on the machine you're logged into. In bigger estates you'd point this at a group of hosts from an inventory and deploy the same service everywhere at once.
+* `become: true` — the role installs a Quadlet under `/etc/containers/systemd/`, which needs root.
+=====
+
+======
+
+.Including the podman system role
+[%collapsible]
+=====
+[source,yaml]
+----
+    - name: Manage the nginx quadlet with the podman system role
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.podman
+----
+
+This is the supported Red Hat role you installed in module 2. You don't write the tasks that pull images, write Quadlet files, or talk to systemd — the role does all of it. Your job is only to *declare what you want* in `vars`.
+=====
+
+======
+
+.The Quadlet specification
+[%collapsible]
+=====
+[source,yaml]
+----
+        podman_quadlet_specs:
+          - name: nginx
+            type: container
+            file_content: |
+              [Container]
+              Image=registry.access.redhat.com/ubi9/nginx-124:1
+              PublishPort=8080:8080
+              PodmanArgs=--security-opt no-new-privileges
+----
+
+`podman_quadlet_specs` is a list of Quadlet unit files for the role to manage. This one is named `nginx` with type `container`, so the role writes it to `/etc/containers/systemd/nginx.container`. That single file generates the systemd service `nginx.service`.
+
+The `[Container]` section is the Quadlet itself:
+
+* `Image=` — a *fully qualified* image name with a pinned tag, from Red Hat's signed registry (`registry.access.redhat.com`). Fully qualified + pinned is deliberate: you know exactly what you're running, you get Red Hat's signed, scanned image, and podman needs the full reference to check for updates later.
+* `PublishPort=8080:8080` — publish container port 8080 on host port 8080. Red Hat's nginx images are built to run as a non-root user *inside* the container, so nginx listens on unprivileged port 8080.
+* `PodmanArgs=--security-opt no-new-privileges` — the container's processes can't gain extra privileges via setuid or file capabilities. One line, and a whole class of container escapes is off the table.
+
+[NOTE]
+====
+Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no extra privileges. And you didn't hand-tune any of it — it's declared, reviewable code.
+====
+=====
+
+======
+
+.Opening the firewall port
+[%collapsible]
+=====
+[source,yaml]
+----
+        podman_firewall:
+          - port: 8080/tcp
+            state: enabled
+----
+
+The same role can also open the port in the host firewall, using the `firewall` system role under the hood. One variable, and the port is reachable from other machines — no `firewall-cmd` incantations to remember.
+=====
+
+======
+
+== What the role will do when it runs
+
+When you run this playbook, the `podman` system role will:
+
+1. Write `/etc/containers/systemd/nginx.container` from your `file_content`
+2. Reload systemd, which generates `nginx.service` from the Quadlet
+3. Pull `registry.access.redhat.com/ubi9/nginx-124:1`
+4. Start the service, which runs the container with your port publish and security options
+
+Next module: run it and prove it.

@@ -1,0 +1,5 @@
+.ansible
+.cache
+.vscode
+.DS_Store
+/www

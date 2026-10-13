@@ -1,0 +1,48 @@
+= Install the Software
+
+Every good lab starts with `dnf install`. The `podman` system role ships in the `rhel-system-roles` package, which also pulls in `ansible-core` — the tool that runs your playbook.
+
+== Install the RHEL system roles
+
+.Install rhel-system-roles
+image::run-command.png[Run the command in the terminal]
+
+[source,bash,run]
+----
+dnf -y install rhel-system-roles
+----
+
+.Here's what the result should look similar to
+image::system-roles-install.png[]
+
+`ansible-core` is installed as a dependency, so you get both the roles and the engine that runs them in one command.
+
+== Find the podman role
+
+The roles are installed under `/usr/share/ansible/roles/`, one directory per role.
+
+[source,bash,run]
+----
+ls /usr/share/ansible/roles/
+----
+
+You should see `rhel-system-roles.podman` in the list. Each role directory ships a `README.md` that documents every variable the role accepts — when you wonder what a role can do, that README is the documentation.
+
+[source,bash,run]
+----
+ls /usr/share/ansible/roles/rhel-system-roles.podman/
+----
+
+== Check podman itself
+
+The `podman` role needs podman 4.4 or later for Quadlet support. RHEL 10 ships podman 5.x, but checking costs nothing:
+
+[source,bash,run]
+----
+podman --version
+----
+
+[NOTE]
+====
+If `dnf` ever complains about a missing repository or an expired subscription on your own machines, remember that lab systems are pre-registered. On the job, `subscription-manager register` (or your organization's Satellite / Red Hat Insights workflow) is how a RHEL system gets access to those repositories.
+====

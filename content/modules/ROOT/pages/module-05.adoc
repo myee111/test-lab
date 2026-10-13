@@ -1,0 +1,108 @@
+= Automatic Updates
+
+Scott's postscript arrived: "Also keep it updated, I guess."
+
+Good news — podman has this built in. The `AutoUpdate=registry` option tells podman to check the registry for a newer image with that tag, pull it, and restart the service. And podman ships a systemd timer that runs those checks on a schedule. You just have to declare it.
+
+== Add AutoUpdate to the Quadlet
+
+Update the playbook by recreating it with one extra line — `AutoUpdate=registry` — in the `[Container]` section:
+
+[source,bash,run]
+----
+cat > ~/podman-lab/playbook.yml << 'EOF'
+---
+- name: Deploy a secure nginx web server
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Manage the nginx quadlet with the podman system role
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.podman
+      vars:
+        podman_quadlet_specs:
+          - name: nginx
+            type: container
+            file_content: |
+              [Container]
+              Image=registry.access.redhat.com/ubi9/nginx-124:1
+              PublishPort=8080:8080
+              PodmanArgs=--security-opt no-new-privileges
+              AutoUpdate=registry
+        podman_firewall:
+          - port: 8080/tcp
+            state: enabled
+EOF
+----
+
+This is the payoff of defining the service as code: the "change request" is one line in a reviewable file, and the role redeploys the whole service from it.
+
+== Re-run the playbook
+
+[source,bash,run]
+----
+ansible-playbook ~/podman-lab/playbook.yml
+----
+
+The role notices the Quadlet changed, updates `/etc/containers/systemd/nginx.container`, and the service is regenerated. Make sure the running container is recreated with the new settings:
+
+[source,bash,run]
+----
+systemctl restart nginx
+----
+
+== Enable the auto-update timer
+
+Podman ships `podman-auto-update.timer`, a systemd timer that runs `podman auto-update` on a schedule. Enable and start it:
+
+[source,bash,run]
+----
+systemctl enable --now podman-auto-update.timer
+----
+
+Check that it's scheduled:
+
+[source,bash,run]
+----
+systemctl list-timers podman-auto-update.timer
+----
+
+== Try an update cycle now
+
+You don't have to wait for the timer — run the update check yourself once:
+
+[source,bash,run]
+----
+podman auto-update
+----
+
+[NOTE]
+====
+If the output says nothing needed updating, that's the point: `podman auto-update` compared the running container's image against the registry tag and found the service already current. When Red Hat publishes a new build of the `1` tag, the timer pulls it and restarts `nginx.service` — your service updates itself while you sleep.
+====
+
+[TIP]
+====
+`AutoUpdate=registry` is why module 3 insisted on a *fully qualified* image name — podman needs the complete registry reference to know what to check. A short name like `Image=nginx` can't be auto-updated this way.
+====
+
+== What you proved
+
+[NOTE]
+====
+*From: Nate (Senior Sysadmin)*
+
+Take a breath and look at what you just did, because Scott certainly won't:
+
+1. **Defined** a service as a Quadlet — a small, reviewable unit file
+2. **Configured** it securely — signed registry, pinned image, non-root container, no privilege escalation
+3. **Installed** it with the supported `podman` system role — one `dnf install`, one playbook
+4. **Deployed** it as a first-class systemd service — `systemctl status nginx`, like any other service
+5. **Automated** its updates — one line in the definition and a systemd timer
+
+No snowflakes, no hand-tuned configs, and nothing that lives only in someone's head. The next time Scott asks for a web server, your answer is: change one YAML file, run the playbook.
+
+When you're ready to go further: the same role does rootless Quadlets (services per user, no root at all), podman secrets, and even full Kubernetes-style YAML with `podman_kube_specs`. The role's `README.md` in `/usr/share/ansible/roles/rhel-system-roles.podman/` covers all of it.
+
+-Nate
+====

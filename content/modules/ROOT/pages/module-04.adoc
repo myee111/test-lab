@@ -1,0 +1,66 @@
+= Deploy and Validate
+
+The playbook is written. Time to let the role do its work — and then prove to Scott that the service actually runs.
+
+== Run the playbook
+
+.Run the playbook
+image::run-command.png[Run the command in the terminal]
+
+[source,bash,run]
+----
+ansible-playbook ~/podman-lab/playbook.yml
+----
+
+.Expect a recap like this (with ok and changed counts)
+[NOTE]
+====
+The first run pulls the nginx image from `registry.access.redhat.com`, so it may take a little while. When it finishes you should see a `PLAY RECAP` with `failed=0`. If a task fails, scroll up — the role's error messages say exactly which step and why.
+====
+
+== Validate the result
+
+Now verify each layer of the stack, from the Quadlet file down to the HTTP response.
+
+First, the Quadlet file the role wrote. This is the service definition you'll hand to the next person:
+
+[source,bash,run]
+----
+cat /etc/containers/systemd/nginx.container
+----
+
+Next, the systemd service generated from it. Quadlet named the service after the file: `nginx.container` became `nginx.service`:
+
+[source,bash,run]
+----
+systemctl status nginx
+----
+
+It should be *active (running)*, with a `podman system service` style description mentioning your Quadlet.
+
+Then, the container itself:
+
+[source,bash,run]
+----
+podman ps
+----
+
+You should see the nginx container running, with port `8080` published.
+
+Finally, the part Scott will actually check — the web server answering requests:
+
+[source,bash,run]
+----
+curl http://localhost:8080
+----
+
+You should get nginx's default page HTML back. The service is defined, configured, installed, and deployed — with zero hand-edited config files.
+
+[NOTE]
+====
+*From: Nate (Senior Sysadmin)*
+
+Notice what happened there. You never wrote an nginx.conf. You never figured out where the image comes from or how to make it start at boot. You declared the service in YAML, ran one playbook, and systemd treats the container exactly like any other service — `systemctl status nginx` just works.
+
+When Scott asks "but how do I restart it?", the answer is `systemctl restart nginx`. He'll be suspicious that it can't be that simple. It is.
+====

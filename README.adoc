@@ -1,0 +1,25 @@
+= Managing Services with the Podman System Role
+
+A ZeroTouch / RHPDS showroom lab for novice systems administrators.
+
+Participants use the RHEL `podman` system role to define, configure, install, and deploy a secure nginx container as a systemd service (Quadlet), then enable automatic container image updates.
+
+== Lab journey
+
+* *module-01* — Introduction (Sysadmin Nate's brief)
+* *module-02* — Install the Software (`dnf install rhel-system-roles`)
+* *module-03* — Author the Playbook (`podman_quadlet_specs` with a Quadlet for a secure nginx container)
+* *module-04* — Deploy & Validate (`ansible-playbook`, `systemctl`, `podman ps`, `curl`)
+* *module-05* — Automatic Updates (`AutoUpdate=registry` and `podman-auto-update.timer`)
+
+== Environment
+
+* 1 VM: `+rhel+` (RHEL 10.2 EUS), terminal access via wetty as root
+* Container image: `registry.access.redhat.com/ubi9/nginx-124:1`
+
+== Building locally
+
+* `./utilities/lab-build` — build the documentation
+* `./utilities/lab-serve` — serve the lab locally for preview
+* `./utilities/lab-stop` — stop the local server
+* `./utilities/lab-clean` — clean build artifacts

@@ -1,0 +1,58 @@
+= Introduction
+
+Welcome to *Managing Services with the Podman System Role*!
+
+Services on Red Hat Enterprise Linux don't have to be hand-tuned snowflakes. In this lab you'll use the `podman` RHEL system role to *define, configure, install, and deploy* a complete service as code — a secure nginx container managed by systemd through a Quadlet — and then make it keep itself updated.
+
+[NOTE]
+====
+*From: Nate (Senior Sysadmin)*
+
+Hey, welcome aboard.
+
+Manager Scott decided the team needs an internal web server. His guidance, verbatim: "Just install a web server on the box and hand-tune the config until it works. Also keep it updated, I guess. By Friday."
+
+Deep breath. There's a better way than hand-tuning: RHEL ships *system roles* — supported, tested Ansible roles that automate common administration tasks in a consistent, repeatable way. One of them, the `podman` role, can describe an entire container service in a few lines of YAML, deploy it as a systemd service, and even keep its image updated automatically.
+
+By the end of this lab you'll have shown Scott that any sysadmin — even a brand new one — can:
+
+1. **Install the software** — get the system roles and tooling onto the machine
+2. **Author a playbook** — define a secure nginx container as a Quadlet
+3. **Deploy and validate** — run the role and prove the service works
+4. **Automate updates** — let the container pull its own updates
+
+No hand-edited config files. No snowflakes. Let's get to work.
+
+-Nate
+====
+
+== Your environment
+
+This lab runs on a single machine, `+rhel+`, and everything happens in its terminal.
+
+You can run commands from the modules by clicking the run icon just above each code block:
+
+.Run the command in the terminal
+image::run-command.png[Run the command in the terminal]
+
+Try it now — this checks which RHEL release the lab machine runs.
+
+[source,bash,run]
+----
+cat /etc/redhat-release
+----
+
+== What is a Quadlet?
+
+A *Quadlet* is a small unit file that describes a container in the way systemd likes to see services. You write `nginx.container` with a `[Container]` section, and at boot (or on `systemctl daemon-reload`) a generator turns it into a regular systemd service — `nginx.service` — that pulls the image and runs the container for you.
+
+Why that matters to you:
+
+* Your container service starts at boot like any other service: `systemctl start nginx`, `systemctl status nginx`, `journalctl -u nginx`.
+* The service is *defined as code* — one small file you can read, version, and hand to the next person.
+* The `podman` system role is the supported way to create and manage those Quadlet files across your systems with Ansible.
+
+[NOTE]
+====
+New to Ansible? You only need three words for this lab: a *playbook* is a YAML file of tasks, a *role* is a packaged, reusable bundle of tasks, and the *system role* is what Red Hat calls its supported roles. The `podman` role does the work; your playbook just tells it what you want.
+====
