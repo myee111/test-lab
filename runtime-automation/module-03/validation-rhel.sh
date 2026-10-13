@@ -11,7 +11,7 @@ if ! grep -q "podman_quadlet_specs" /root/podman-lab/playbook.yml; then
     exit 1
 fi
 
-if ! grep -q "registry.access.redhat.com/ubi9/nginx-124" /root/podman-lab/playbook.yml; then
+if ! grep -q "registry.access.redhat.com/ubi10/nginx-126" /root/podman-lab/playbook.yml; then
     echo "FAIL: The quadlet does not pull the nginx image from registry.access.redhat.com."
     exit 1
 fi

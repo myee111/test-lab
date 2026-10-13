@@ -54,7 +54,7 @@ Finally, the part Scott will actually check — the web server answering request
 curl http://localhost:8080
 ----
 
-You should get nginx's default page HTML back. The service is defined, configured, installed, and deployed — with zero hand-edited config files.
+You should get the Super-Business web page back — the HTML your playbook wrote and the Quadlet mounted into the container. The service is defined, configured, installed, and deployed — with zero hand-edited config files.
 
 [NOTE]
 ====

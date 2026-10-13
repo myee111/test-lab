@@ -15,7 +15,7 @@ Participants use the RHEL `podman` system role to define, configure, install, an
 == Environment
 
 * 1 VM: `+rhel+` (RHEL 10.2 EUS), terminal access via wetty as root
-* Container image: `registry.access.redhat.com/ubi9/nginx-124:1`
+* Container image: `registry.access.redhat.com/ubi10/nginx-126:10.0`
 
 == Building locally
 

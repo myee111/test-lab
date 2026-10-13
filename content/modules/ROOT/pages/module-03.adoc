@@ -23,6 +23,13 @@ cat > ~/podman-lab/playbook.yml << 'EOF'
   hosts: localhost
   become: true
   tasks:
+    - name: Create the web content
+      ansible.builtin.copy:
+        content: |
+          <h1>Super-Business internal web server</h1>
+          <p>Served by a systemd-managed nginx container.</p>
+        dest: /opt/web/index.html
+        mode: '0644'
     - name: Manage the nginx quadlet with the podman system role
       ansible.builtin.include_role:
         name: redhat.rhel_system_roles.podman
@@ -32,16 +39,18 @@ cat > ~/podman-lab/playbook.yml << 'EOF'
             type: container
             file_content: |
               [Container]
-              Image=registry.access.redhat.com/ubi9/nginx-124:1
+              Image=registry.access.redhat.com/ubi10/nginx-126:10.0
               PublishPort=8080:8080
               PodmanArgs=--security-opt no-new-privileges
+              Exec=/usr/libexec/s2i/run
+              Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
         podman_firewall:
           - port: 8080/tcp
             state: enabled
 EOF
 ----
 
-That's the whole service. Twenty-odd lines of YAML define, configure, and deploy a web server. Let's walk through what each part does before you run it.
+That's the whole service — a web page, a Quadlet, and a firewall rule, all declared in one reviewable file. Let's walk through what each part does before you run it.
 
 =====
 The play starts with the header — which host runs the playbook and whether it needs root.
@@ -58,13 +67,36 @@ The play starts with the header — which host runs the playbook and whether it 
 ----
 
 * `hosts: localhost` — apply this on the machine you're logged into. In bigger estates you'd point this at a group of hosts from an inventory and deploy the same service everywhere at once.
-* `become: true` — the role installs a Quadlet under `/etc/containers/systemd/`, which needs root.
+* `become: true` — the playbook writes files under `/opt` and installs a Quadlet under `/etc/containers/systemd/`, which needs root.
 
 ====
 =====
 
 =====
-The single task in the play includes the `podman` system role and passes it everything you want.
+The container ships without a web page, so the first task puts one on disk.
+
+.Creating the web content
+[%collapsible]
+====
+
+[source,yaml]
+----
+    - name: Create the web content
+      ansible.builtin.copy:
+        content: |
+          <h1>Super-Business internal web server</h1>
+          <p>Served by a systemd-managed nginx container.</p>
+        dest: /opt/web/index.html
+        mode: '0644'
+----
+
+The nginx container image ships an empty web root — it's built as a base for your own content. This task writes a simple page to `/opt/web/index.html` on the host, which the Quadlet then mounts into the container. On the job, `/opt/web/` is where you'd drop the real site.
+
+====
+=====
+
+=====
+The single role include passes the `podman` system role everything you want.
 
 .Including the podman system role
 [%collapsible]
@@ -96,26 +128,30 @@ The Quadlet specification is where the service itself gets defined.
             type: container
             file_content: |
               [Container]
-              Image=registry.access.redhat.com/ubi9/nginx-124:1
+              Image=registry.access.redhat.com/ubi10/nginx-126:10.0
               PublishPort=8080:8080
               PodmanArgs=--security-opt no-new-privileges
+              Exec=/usr/libexec/s2i/run
+              Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
 ----
 
 `podman_quadlet_specs` is a list of Quadlet unit files for the role to manage. This one is named `nginx` with type `container`, so the role writes it to `/etc/containers/systemd/nginx.container`. That single file generates the systemd service `nginx.service`.
 
 The `[Container]` section is the Quadlet itself:
 
-* `Image=` — a *fully qualified* image name with a pinned tag, from Red Hat's signed registry (`registry.access.redhat.com`). Fully qualified + pinned is deliberate: you know exactly what you're running, you get Red Hat's signed, scanned image, and podman needs the full reference to check for updates later.
-* `PublishPort=8080:8080` — publish container port 8080 on host port 8080. Red Hat's nginx images are built to run as a non-root user *inside* the container, so nginx listens on unprivileged port 8080.
+* `Image=` — a *fully qualified* image name with a pinned tag, from Red Hat's signed registry (`registry.access.redhat.com`). `ubi10/nginx-126` is the nginx built for RHEL 10, pinned to the `10.0` tag. Fully qualified + pinned is deliberate: you know exactly what you're running, you get Red Hat's signed, scanned image, and podman needs the full reference to check for updates later.
+* `PublishPort=8080:8080` — publish container port 8080 on host port 8080. The nginx image is built to run as a non-root user *inside* the container, so nginx listens on unprivileged port 8080.
 * `PodmanArgs=--security-opt no-new-privileges` — the container's processes can't gain extra privileges via setuid or file capabilities. One line, and a whole class of container escapes is off the table.
-
-====
-=====
+* `Exec=/usr/libexec/s2i/run` — the image's *default* command just prints usage help and exits (it's a source-to-image builder base). `Exec=` tells systemd to run the image's start script instead, which wires logs to stdout and launches nginx in the foreground.
+* `Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z` — mount the page you created into the container's web root. The `:Z` tells podman to label the file for SELinux so the container can read it.
 
 [NOTE]
 ====
-Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no extra privileges. And you didn't hand-tune any of it — it's declared, reviewable code.
+Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no privilege escalation. And you didn't hand-tune any of it — it's declared, reviewable code.
 ====
+
+====
+=====
 
 =====
 One variable opens the port in the host firewall.
@@ -142,7 +178,7 @@ When you run this playbook, the `podman` system role will:
 
 1. Write `/etc/containers/systemd/nginx.container` from your `file_content`
 2. Reload systemd, which generates `nginx.service` from the Quadlet
-3. Pull `registry.access.redhat.com/ubi9/nginx-124:1`
-4. Start the service, which runs the container with your port publish and security options
+3. Pull `registry.access.redhat.com/ubi10/nginx-126:10.0`
+4. Start the service, which mounts your page, publishes port 8080, and launches nginx
 
 Next module: run it and prove it.
