@@ -43,9 +43,13 @@ EOF
 
 That's the whole service. Twenty-odd lines of YAML define, configure, and deploy a web server. Let's walk through what each part does before you run it.
 
+=====
+The play starts with the header — which host runs the playbook and whether it needs root.
+
 .The play header
 [%collapsible]
 ====
+
 [source,yaml]
 ----
 - name: Deploy a secure nginx web server
@@ -55,11 +59,17 @@ That's the whole service. Twenty-odd lines of YAML define, configure, and deploy
 
 * `hosts: localhost` — apply this on the machine you're logged into. In bigger estates you'd point this at a group of hosts from an inventory and deploy the same service everywhere at once.
 * `become: true` — the role installs a Quadlet under `/etc/containers/systemd/`, which needs root.
+
 ====
+=====
+
+=====
+The single task in the play includes the `podman` system role and passes it everything you want.
 
 .Including the podman system role
 [%collapsible]
 ====
+
 [source,yaml]
 ----
     - name: Manage the nginx quadlet with the podman system role
@@ -68,11 +78,17 @@ That's the whole service. Twenty-odd lines of YAML define, configure, and deploy
 ----
 
 This is the supported Red Hat role you installed in module 2. You don't write the tasks that pull images, write Quadlet files, or talk to systemd — the role does all of it. Your job is only to *declare what you want* in `vars`.
+
 ====
+=====
+
+=====
+The Quadlet specification is where the service itself gets defined.
 
 .The Quadlet specification
 [%collapsible]
 ====
+
 [source,yaml]
 ----
         podman_quadlet_specs:
@@ -92,16 +108,22 @@ The `[Container]` section is the Quadlet itself:
 * `Image=` — a *fully qualified* image name with a pinned tag, from Red Hat's signed registry (`registry.access.redhat.com`). Fully qualified + pinned is deliberate: you know exactly what you're running, you get Red Hat's signed, scanned image, and podman needs the full reference to check for updates later.
 * `PublishPort=8080:8080` — publish container port 8080 on host port 8080. Red Hat's nginx images are built to run as a non-root user *inside* the container, so nginx listens on unprivileged port 8080.
 * `PodmanArgs=--security-opt no-new-privileges` — the container's processes can't gain extra privileges via setuid or file capabilities. One line, and a whole class of container escapes is off the table.
+
 ====
+=====
 
 [NOTE]
 ====
 Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no extra privileges. And you didn't hand-tune any of it — it's declared, reviewable code.
 ====
 
+=====
+One variable opens the port in the host firewall.
+
 .Opening the firewall port
 [%collapsible]
 ====
+
 [source,yaml]
 ----
         podman_firewall:
@@ -110,7 +132,9 @@ Look at the security story you got for free: a pinned, signed image from a trust
 ----
 
 The same role can also open the port in the host firewall, using the `firewall` system role under the hood. One variable, and the port is reachable from other machines — no `firewall-cmd` incantations to remember.
+
 ====
+=====
 
 == What the role will do when it runs
 
