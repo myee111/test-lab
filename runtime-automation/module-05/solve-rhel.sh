@@ -7,6 +7,11 @@ cat > /root/podman-lab/playbook.yml << 'EOF'
   hosts: localhost
   become: true
   tasks:
+    - name: Create the web content directory
+      ansible.builtin.file:
+        path: /opt/web
+        state: directory
+        mode: '0755'
     - name: Create the web content
       ansible.builtin.copy:
         content: |

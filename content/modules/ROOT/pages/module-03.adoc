@@ -23,6 +23,11 @@ cat > ~/podman-lab/playbook.yml << 'EOF'
   hosts: localhost
   become: true
   tasks:
+    - name: Create the web content directory
+      ansible.builtin.file:
+        path: /opt/web
+        state: directory
+        mode: '0755'
     - name: Create the web content
       ansible.builtin.copy:
         content: |
@@ -81,6 +86,11 @@ The container ships without a web page, so the first task puts one on disk.
 
 [source,yaml]
 ----
+    - name: Create the web content directory
+      ansible.builtin.file:
+        path: /opt/web
+        state: directory
+        mode: '0755'
     - name: Create the web content
       ansible.builtin.copy:
         content: |
@@ -90,7 +100,7 @@ The container ships without a web page, so the first task puts one on disk.
         mode: '0644'
 ----
 
-The nginx container image ships an empty web root — it's built as a base for your own content. This task writes a simple page to `/opt/web/index.html` on the host, which the Quadlet then mounts into the container. On the job, `/opt/web/` is where you'd drop the real site.
+The nginx container image ships an empty web root — it's built as a base for your own content. The first task creates `/opt/web/` on the host, and the second writes a simple page to `/opt/web/index.html`, which the Quadlet then mounts into the container. On the job, `/opt/web/` is where you'd drop the real site.
 
 ====
 =====
