@@ -33,14 +33,16 @@ You should see `rhel-system-roles.podman` in the list. Each role directory ships
 ls /usr/share/ansible/roles/rhel-system-roles.podman/
 ----
 
-== Check podman itself
+== Check podman (it's not there yet)
 
-The `podman` role needs podman 4.4 or later for Quadlet support. RHEL 10 ships podman 5.x, but checking costs nothing:
+The `podman` role needs podman 4.4 or later for Quadlet support — RHEL 10 ships podman 5.x. But notice the roles package doesn't install podman itself:
 
 [source,bash,run]
 ----
-podman --version
+rpm -q podman
 ----
+
+You should get `package podman is not installed`. That's expected: `rhel-system-roles` ships the automation, not every tool it manages. When you run the playbook in module 4, the first thing the `podman` system role does is ensure the podman package is installed — then it deploys your Quadlet.
 
 [NOTE]
 ====
