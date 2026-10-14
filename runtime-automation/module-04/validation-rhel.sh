@@ -2,7 +2,7 @@
 echo "Validating module called module-04" >> /tmp/progress.log
 
 if ! [ -f /etc/containers/systemd/nginx.container ]; then
-    echo "FAIL: /etc/containers/systemd/nginx.container not found. Run the playbook: ansible-playbook ~/podman-lab/playbook.yml"
+    echo "FAIL: /etc/containers/systemd/nginx.container not found. Run the playbook: ansible-playbook ~/soe.yml"
     exit 1
 fi
 

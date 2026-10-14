@@ -9,7 +9,7 @@ image::run-command.png[Run the command in the terminal]
 
 [source,bash,run]
 ----
-ansible-playbook ~/podman-lab/playbook.yml
+ansible-playbook ~/soe.yml
 ----
 
 .Expect a recap like this (with ok and changed counts)

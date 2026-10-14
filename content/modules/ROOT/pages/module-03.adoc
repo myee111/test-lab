@@ -1,28 +1,35 @@
 = Author the Playbook
 
-Now for the part Scott said would take all week. You're going to describe the entire web service in one small YAML file, using the `podman` system role to deploy it.
+Now for the part Scott said would take all week. You're going to describe the entire web service in one small YAML playbook, using the `podman` system role to deploy it.
 
-== Create the project directory
-
-Keeping the playbook in its own directory makes it easy to find, version, and hand to the next person.
-
-[source,bash,run]
-----
-mkdir -p ~/podman-lab
-----
+The playbook follows the standard RHEL system roles layout: play-level `vars` that declare what you want, and the role that does the work. Sysadmins across Red Hat write system role playbooks exactly this way — including your lab neighbor, the one where `soe.yml` configures kernel settings and session recording.
 
 == Write the playbook
 
-Create `~/podman-lab/playbook.yml` with the following content — paste the whole block into the terminal.
+Create `~/soe.yml` with the following content — paste the whole block into the terminal.
 
 [source,bash,run]
 ----
-cat > ~/podman-lab/playbook.yml << 'EOF'
+cat > ~/soe.yml << 'EOF'
 ---
 - name: Deploy a secure nginx web server
   hosts: localhost
-  become: true
-  tasks:
+  remote_user: root
+  vars:
+    podman_quadlet_specs:
+      - name: nginx
+        type: container
+        file_content: |
+          [Container]
+          Image=registry.access.redhat.com/ubi10/nginx-126:10.0
+          PublishPort=8080:8080
+          PodmanArgs=--security-opt no-new-privileges
+          Exec=/usr/libexec/s2i/run
+          Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
+    podman_firewall:
+      - port: 8080/tcp
+        state: enabled
+  pre_tasks:
     - name: Create the web content directory
       ansible.builtin.file:
         path: /opt/web
@@ -35,30 +42,15 @@ cat > ~/podman-lab/playbook.yml << 'EOF'
           <p>Served by a systemd-managed nginx container.</p>
         dest: /opt/web/index.html
         mode: '0644'
-    - name: Manage the nginx quadlet with the podman system role
-      ansible.builtin.include_role:
-        name: redhat.rhel_system_roles.podman
-      vars:
-        podman_quadlet_specs:
-          - name: nginx
-            type: container
-            file_content: |
-              [Container]
-              Image=registry.access.redhat.com/ubi10/nginx-126:10.0
-              PublishPort=8080:8080
-              PodmanArgs=--security-opt no-new-privileges
-              Exec=/usr/libexec/s2i/run
-              Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
-        podman_firewall:
-          - port: 8080/tcp
-            state: enabled
+  roles:
+    - role: rhel-system-roles.podman
 EOF
 ----
 
 That's the whole service — a web page, a Quadlet, and a firewall rule, all declared in one reviewable file. Let's walk through what each part does before you run it.
 
 =====
-The play starts with the header — which host runs the playbook and whether it needs root.
+The play starts with the header — which host runs the playbook and as whom.
 
 .The play header
 [%collapsible]
@@ -68,81 +60,38 @@ The play starts with the header — which host runs the playbook and whether it 
 ----
 - name: Deploy a secure nginx web server
   hosts: localhost
-  become: true
+  remote_user: root
 ----
 
 * `hosts: localhost` — apply this on the machine you're logged into. In bigger estates you'd point this at a group of hosts from an inventory and deploy the same service everywhere at once.
-* `become: true` — the playbook writes files under `/opt` and installs a Quadlet under `/etc/containers/systemd/`, which needs root.
+* `remote_user: root` — the playbook writes files under `/opt` and installs a Quadlet under `/etc/containers/systemd/`, which needs root. If you were managing remote hosts, this is where you'd set the connecting user.
 
 ====
 =====
 
 =====
-The container ships without a web page, so the first task puts one on disk.
+The role variables declare what you want. Everything the role needs to know lives here, at the top of the play.
 
-.Creating the web content
+.The role variables
 [%collapsible]
 ====
 
 [source,yaml]
 ----
-    - name: Create the web content directory
-      ansible.builtin.file:
-        path: /opt/web
-        state: directory
-        mode: '0755'
-    - name: Create the web content
-      ansible.builtin.copy:
-        content: |
-          <h1>Super-Business internal web server</h1>
-          <p>Served by a systemd-managed nginx container.</p>
-        dest: /opt/web/index.html
-        mode: '0644'
-----
-
-The nginx container image ships an empty web root — it's built as a base for your own content. The first task creates `/opt/web/` on the host, and the second writes a simple page to `/opt/web/index.html`, which the Quadlet then mounts into the container. On the job, `/opt/web/` is where you'd drop the real site.
-
-====
-=====
-
-=====
-The single role include passes the `podman` system role everything you want.
-
-.Including the podman system role
-[%collapsible]
-====
-
-[source,yaml]
-----
-    - name: Manage the nginx quadlet with the podman system role
-      ansible.builtin.include_role:
-        name: redhat.rhel_system_roles.podman
-----
-
-This is the supported Red Hat role you installed in module 2. You don't write the tasks that pull images, write Quadlet files, or talk to systemd — the role does all of it. Your job is only to *declare what you want* in `vars`.
-
-====
-=====
-
-=====
-The Quadlet specification is where the service itself gets defined.
-
-.The Quadlet specification
-[%collapsible]
-====
-
-[source,yaml]
-----
-        podman_quadlet_specs:
-          - name: nginx
-            type: container
-            file_content: |
-              [Container]
-              Image=registry.access.redhat.com/ubi10/nginx-126:10.0
-              PublishPort=8080:8080
-              PodmanArgs=--security-opt no-new-privileges
-              Exec=/usr/libexec/s2i/run
-              Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
+  vars:
+    podman_quadlet_specs:
+      - name: nginx
+        type: container
+        file_content: |
+          [Container]
+          Image=registry.access.redhat.com/ubi10/nginx-126:10.0
+          PublishPort=8080:8080
+          PodmanArgs=--security-opt no-new-privileges
+          Exec=/usr/libexec/s2i/run
+          Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z
+    podman_firewall:
+      - port: 8080/tcp
+        state: enabled
 ----
 
 `podman_quadlet_specs` is a list of Quadlet unit files for the role to manage. This one is named `nginx` with type `container`, so the role writes it to `/etc/containers/systemd/nginx.container`. That single file generates the systemd service `nginx.service`.
@@ -153,31 +102,63 @@ The `[Container]` section is the Quadlet itself:
 * `PublishPort=8080:8080` — publish container port 8080 on host port 8080. The nginx image is built to run as a non-root user *inside* the container, so nginx listens on unprivileged port 8080.
 * `PodmanArgs=--security-opt no-new-privileges` — the container's processes can't gain extra privileges via setuid or file capabilities. One line, and a whole class of container escapes is off the table.
 * `Exec=/usr/libexec/s2i/run` — the image's *default* command just prints usage help and exits (it's a source-to-image builder base). `Exec=` tells systemd to run the image's start script instead, which wires logs to stdout and launches nginx in the foreground.
-* `Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z` — mount the page you created into the container's web root. The `:Z` tells podman to label the file for SELinux so the container can read it.
+* `Volume=/opt/web/index.html:/opt/app-root/src/index.html:Z` — mount the page you create below into the container's web root. The `:Z` tells podman to label the file for SELinux so the container can read it.
 
-[NOTE]
-====
-Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no privilege escalation. And you didn't hand-tune any of it — it's declared, reviewable code.
-====
+`podman_firewall` opens the port in the host firewall, using the `firewall` system role under the hood. One variable, and the port is reachable from other machines — no `firewall-cmd` incantations to remember.
+
+For every variable the role accepts, see its README: `/usr/share/ansible/roles/rhel-system-roles.podman/README.md`.
 
 ====
 =====
 
 =====
-One variable opens the port in the host firewall.
+`pre_tasks` run before the roles — the right place for anything the service depends on.
 
-.Opening the firewall port
+.Creating the web content
 [%collapsible]
 ====
 
 [source,yaml]
 ----
-        podman_firewall:
-          - port: 8080/tcp
-            state: enabled
+  pre_tasks:
+    - name: Create the web content directory
+      ansible.builtin.file:
+        path: /opt/web
+        state: directory
+        mode: '0755'
+    - name: Create the web content
+      ansible.builtin.copy:
+        content: |
+          <h1>Super-Business internal web server</h1>
+          <p>Served by a systemd-managed nginx container.</p>
+        dest: /opt/web/index.html
+        mode: '0644'
 ----
 
-The same role can also open the port in the host firewall, using the `firewall` system role under the hood. One variable, and the port is reachable from other machines — no `firewall-cmd` incantations to remember.
+The nginx container image ships an empty web root — it's built as a base for your own content. These tasks create `/opt/web/` and write a simple page to `/opt/web/index.html`, which the Quadlet mounts into the container. On the job, `/opt/web/` is where you'd drop the real site.
+
+====
+=====
+
+=====
+The role itself. One line does all the work.
+
+.Including the podman system role
+[%collapsible]
+====
+
+[source,yaml]
+----
+  roles:
+    - role: rhel-system-roles.podman
+----
+
+This is the supported Red Hat role you installed in module 2, referenced by its role name exactly as it's installed under `/usr/share/ansible/roles/`. You don't write the tasks that pull images, write Quadlet files, or talk to systemd — the role does all of it. Your job is only to *declare what you want* in `vars`.
+
+[NOTE]
+====
+Look at the security story you got for free: a pinned, signed image from a trusted registry; a container that runs as a non-root user; no privilege escalation. And you didn't hand-tune any of it — it's declared, reviewable code.
+====
 
 ====
 =====
